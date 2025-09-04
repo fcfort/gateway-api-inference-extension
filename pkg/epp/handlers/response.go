@@ -23,6 +23,7 @@ import (
 
 	configPb "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	extProcPb "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
+	"google.golang.org/protobuf/types/known/structpb"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"sigs.k8s.io/gateway-api-inference-extension/pkg/epp/metrics"
@@ -61,6 +62,49 @@ func (s *StreamingServer) HandleResponseBody(ctx context.Context, reqCtx *Reques
 	reqCtx.ResponseComplete = true
 
 	reqCtx.respBodyResp = generateResponseBodyResponses(responseBytes, true)
+
+	if reqCtx.Usage.PromptTokens > 0 || reqCtx.Usage.CompletionTokens > 0 || reqCtx.Usage.TotalTokens > 0 {
+		metadataStruct := &structpb.Struct{
+			Fields: map[string]*structpb.Value{
+				"request_metrics": {
+					Kind: &structpb.Value_StructValue{
+						StructValue: &structpb.Struct{
+							Fields: map[string]*structpb.Value{
+								"prompt_tokens": {
+									Kind: &structpb.Value_NumberValue{
+										NumberValue: float64(reqCtx.Usage.PromptTokens),
+									},
+								},
+								"completion_tokens": {
+									Kind: &structpb.Value_NumberValue{
+										NumberValue: float64(reqCtx.Usage.CompletionTokens),
+									},
+								},
+								"total_tokens": {
+									Kind: &structpb.Value_NumberValue{
+										NumberValue: float64(reqCtx.Usage.TotalTokens),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		if len(reqCtx.respBodyResp) > 0 {
+			lastResp := reqCtx.respBodyResp[len(reqCtx.respBodyResp)-1]
+			if lastResp.DynamicMetadata == nil {
+				lastResp.DynamicMetadata = &structpb.Struct{Fields: make(map[string]*structpb.Value)}
+			}
+			lastResp.DynamicMetadata.Fields["envoy.dynamic_sharding.metric"] = &structpb.Value{
+				Kind: &structpb.Value_StructValue{
+					StructValue: metadataStruct,
+				},
+			}
+		}
+	}
+
 	return reqCtx, nil
 }
 

@@ -22,6 +22,8 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	logutil "sigs.k8s.io/gateway-api-inference-extension/pkg/epp/util/logging"
 )
@@ -154,4 +156,41 @@ func TestHandleStreamedResponseBody(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestHandleResponseBodyAddsMetricsToResponseMetadata(t *testing.T) {
+	s := &StreamingServer{}
+
+	t.Run("with usage data sets dynamic metadata", func(t *testing.T) {
+		// setup
+		reqCtx := &RequestContext{}
+		response := map[string]any{
+			"usage": map[string]any{
+				"prompt_tokens":     float64(10),
+				"completion_tokens": float64(20),
+				"total_tokens":      float64(30),
+			},
+		}
+
+		// execute
+		reqCtx, err := s.HandleResponseBody(context.Background(), reqCtx, response)
+
+		// assert
+		require.NoError(t, err)
+		require.NotNil(t, reqCtx.respBodyResp)
+		require.NotEmpty(t, reqCtx.respBodyResp)
+
+		lastResp := reqCtx.respBodyResp[len(reqCtx.respBodyResp)-1]
+		require.NotNil(t, lastResp.DynamicMetadata)
+
+		metadata := lastResp.DynamicMetadata.Fields["envoy.dynamic_sharding.metric"].GetStructValue()
+		require.NotNil(t, metadata)
+
+		requestMetrics := metadata.Fields["request_metrics"].GetStructValue()
+		require.NotNil(t, requestMetrics)
+
+		assert.Equal(t, float64(10), requestMetrics.Fields["prompt_tokens"].GetNumberValue())
+		assert.Equal(t, float64(20), requestMetrics.Fields["completion_tokens"].GetNumberValue())
+		assert.Equal(t, float64(30), requestMetrics.Fields["total_tokens"].GetNumberValue())
+	})
 }
