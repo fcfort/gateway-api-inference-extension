@@ -21,6 +21,8 @@ import (
 
 	configPb "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	extProcPb "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"sigs.k8s.io/gateway-api-inference-extension/pkg/epp/metadata"
 )
 
@@ -65,4 +67,28 @@ func TestHandleRequestHeaders(t *testing.T) {
 	if reqCtx.Request.Headers[metadata.FlowFairnessIDKey] == "test-fairness-id-value" {
 		t.Errorf("expected fairness ID header to be removed from request headers, but it was not")
 	}
+}
+
+func TestHandleRequestBody(t *testing.T) {
+	s := &StreamingServer{}
+
+	t.Run("valid JSON body", func(t *testing.T) {
+		reqCtx := &RequestContext{
+			Request: &Request{
+				Headers: make(map[string]string),
+			},
+		}
+		jsonBody := `{"prompt": "hello"}`
+
+		err := s.HandleRequestBody(reqCtx, []byte(jsonBody))
+		require.NoError(t, err)
+
+		var bodyJSON = reqCtx.Request.Body
+
+		assert.Contains(t, bodyJSON, "stream_options")
+		streamOptions, ok := bodyJSON["stream_options"].(map[string]interface{})
+		require.True(t, ok)
+		assert.Equal(t, true, streamOptions["include_usage"])
+		assert.Equal(t, "hello", bodyJSON["prompt"])
+	})
 }

@@ -208,7 +208,7 @@ func (s *StreamingServer) Process(srv extProcPb.ExternalProcessor_ProcessServer)
 			// Message is buffered, we can read and decode.
 			if v.RequestBody.EndOfStream {
 				loggerTrace.Info("decoding")
-				err = json.Unmarshal(body, &reqCtx.Request.Body)
+				err = s.HandleRequestBody(reqCtx, body)
 				if err != nil {
 					if logger.V(logutil.DEBUG).Enabled() {
 						err = errutil.Error{Code: errutil.BadRequest, Msg: "Error unmarshaling request body: " + string(body)}

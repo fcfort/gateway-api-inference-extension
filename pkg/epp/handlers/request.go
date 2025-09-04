@@ -17,6 +17,7 @@ limitations under the License.
 package handlers
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"time"
@@ -80,6 +81,23 @@ func (s *StreamingServer) HandleRequestHeaders(reqCtx *RequestContext, req *extP
 			delete(reqCtx.Request.Headers, header.Key)
 		}
 	}
+	return nil
+}
+
+func (s *StreamingServer) HandleRequestBody(reqCtx *RequestContext, body []byte) error {
+	if err := json.Unmarshal(body, &reqCtx.Request.Body); err != nil {
+		return err
+	}
+
+	if reqCtx.Request.Body == nil {
+		reqCtx.Request.Body = make(map[string]any)
+	}
+
+	streamOptions := map[string]any{
+		"include_usage": true,
+	}
+	reqCtx.Request.Body["stream_options"] = streamOptions
+
 	return nil
 }
 
