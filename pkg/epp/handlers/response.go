@@ -97,7 +97,7 @@ func (s *StreamingServer) HandleResponseBody(ctx context.Context, reqCtx *Reques
 			if lastResp.DynamicMetadata == nil {
 				lastResp.DynamicMetadata = &structpb.Struct{Fields: make(map[string]*structpb.Value)}
 			}
-			lastResp.DynamicMetadata.Fields["envoy.dynamic_sharding.metric"] = &structpb.Value{
+			lastResp.DynamicMetadata.Fields["envoy.dynamic_sharding.metrics"] = &structpb.Value{
 				Kind: &structpb.Value_StructValue{
 					StructValue: metadataStruct,
 				},
