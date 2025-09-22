@@ -72,23 +72,69 @@ func TestHandleRequestHeaders(t *testing.T) {
 func TestHandleRequestBody(t *testing.T) {
 	s := &StreamingServer{}
 
-	t.Run("valid JSON body", func(t *testing.T) {
-		reqCtx := &RequestContext{
-			Request: &Request{
-				Headers: make(map[string]string),
-			},
-		}
-		jsonBody := `{"prompt": "hello"}`
+	testCases := []struct {
+		name                string
+		jsonBody            string
+		expectStreamOptions bool
+		expectedPrompt      interface{}
+	}{
+		{
+			name:                "stream true",
+			jsonBody:            `{"prompt": "hello", "stream": true}`,
+			expectStreamOptions: true,
+			expectedPrompt:      "hello",
+		},
+		{
+			name:                "stream false",
+			jsonBody:            `{"prompt": "hello", "stream": false}`,
+			expectStreamOptions: false,
+			expectedPrompt:      "hello",
+		},
+		{
+			name:                "stream not present",
+			jsonBody:            `{"prompt": "hello"}`,
+			expectStreamOptions: false,
+			expectedPrompt:      "hello",
+		},
+		{
+			name:                "empty body",
+			jsonBody:            `{}`,
+			expectStreamOptions: false,
+			expectedPrompt:      nil,
+		},
+		{
+			name:                "stream not a bool",
+			jsonBody:            `{"prompt": "hello", "stream": "true"}`,
+			expectStreamOptions: false,
+			expectedPrompt:      "hello",
+		},
+	}
 
-		err := s.HandleRequestBody(reqCtx, []byte(jsonBody))
-		require.NoError(t, err)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			reqCtx := &RequestContext{
+				Request: &Request{
+					Headers: make(map[string]string),
+				},
+			}
 
-		var bodyJSON = reqCtx.Request.Body
+			err := s.HandleRequestBody(reqCtx, []byte(tc.jsonBody))
+			require.NoError(t, err)
 
-		assert.Contains(t, bodyJSON, "stream_options")
-		streamOptions, ok := bodyJSON["stream_options"].(map[string]interface{})
-		require.True(t, ok)
-		assert.Equal(t, true, streamOptions["include_usage"])
-		assert.Equal(t, "hello", bodyJSON["prompt"])
-	})
+			bodyJSON := reqCtx.Request.Body
+
+			if tc.expectStreamOptions {
+				assert.Contains(t, bodyJSON, "stream_options")
+				streamOptions, ok := bodyJSON["stream_options"].(map[string]interface{})
+				require.True(t, ok)
+				assert.Equal(t, true, streamOptions["include_usage"])
+			} else {
+				assert.NotContains(t, bodyJSON, "stream_options")
+			}
+
+			if tc.expectedPrompt != nil {
+				assert.Equal(t, tc.expectedPrompt, bodyJSON["prompt"])
+			}
+		})
+	}
 }

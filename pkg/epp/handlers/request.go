@@ -93,10 +93,13 @@ func (s *StreamingServer) HandleRequestBody(reqCtx *RequestContext, body []byte)
 		reqCtx.Request.Body = make(map[string]any)
 	}
 
-	streamOptions := map[string]any{
-		"include_usage": true,
+	// Only set include_usage when stream=true is already present on the request.
+	if stream, ok := reqCtx.Request.Body["stream"].(bool); ok && stream {
+		streamOptions := map[string]any{
+			"include_usage": true,
+		}
+		reqCtx.Request.Body["stream_options"] = streamOptions
 	}
-	reqCtx.Request.Body["stream_options"] = streamOptions
 
 	return nil
 }
