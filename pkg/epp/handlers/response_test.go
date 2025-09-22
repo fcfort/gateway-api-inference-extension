@@ -183,7 +183,7 @@ func TestHandleResponseBodyAddsMetricsToResponseMetadata(t *testing.T) {
 		lastResp := reqCtx.respBodyResp[len(reqCtx.respBodyResp)-1]
 		require.NotNil(t, lastResp.DynamicMetadata)
 
-		metadata := lastResp.DynamicMetadata.Fields["envoy.dynamic_sharding.metric"].GetStructValue()
+		metadata := lastResp.DynamicMetadata.Fields["envoy.dynamic_sharding.metrics"].GetStructValue()
 		require.NotNil(t, metadata)
 
 		requestMetrics := metadata.Fields["request_metrics"].GetStructValue()
