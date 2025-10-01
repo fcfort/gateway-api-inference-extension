@@ -57,12 +57,31 @@ func (s *StreamingServer) HandleResponseBody(ctx context.Context, reqCtx *Reques
 	// ResponseComplete is to indicate the response is complete. In non-streaming
 	// case, it will be set to be true once the response is processed; in
 	// streaming case, it will be set to be true once the last chunk is processed.
-	// TODO(https://github.com/kubernetes-sigs/gateway-api-inference-extension/issues/178)
-	// will add the processing for streaming case.
 	reqCtx.ResponseComplete = true
 
 	reqCtx.respBodyResp = generateResponseBodyResponses(responseBytes, true)
 
+	addDynamicMetadata(reqCtx)
+
+	return reqCtx, nil
+}
+
+// The function is to handle streaming response if the modelServer is streaming.
+func (s *StreamingServer) HandleResponseBodyModelStreaming(ctx context.Context, reqCtx *RequestContext, responseText string) {
+	if strings.Contains(responseText, streamingEndMsg) {
+		resp := parseRespForUsage(ctx, responseText)
+		reqCtx.Usage = resp.Usage
+		metrics.RecordInputTokens(reqCtx.IncomingModelName, reqCtx.TargetModelName, resp.Usage.PromptTokens)
+		metrics.RecordOutputTokens(reqCtx.IncomingModelName, reqCtx.TargetModelName, resp.Usage.CompletionTokens)
+
+		// We need to generate a response body to add the dynamic metadata to.
+		reqCtx.respBodyResp = generateResponseBodyResponses([]byte(responseText), true)
+
+		addDynamicMetadata(reqCtx)
+	}
+}
+
+func addDynamicMetadata(reqCtx *RequestContext) {
 	if reqCtx.Usage.PromptTokens > 0 || reqCtx.Usage.CompletionTokens > 0 || reqCtx.Usage.TotalTokens > 0 {
 		metadataStruct := &structpb.Struct{
 			Fields: map[string]*structpb.Value{
@@ -103,18 +122,6 @@ func (s *StreamingServer) HandleResponseBody(ctx context.Context, reqCtx *Reques
 				},
 			}
 		}
-	}
-
-	return reqCtx, nil
-}
-
-// The function is to handle streaming response if the modelServer is streaming.
-func (s *StreamingServer) HandleResponseBodyModelStreaming(ctx context.Context, reqCtx *RequestContext, responseText string) {
-	if strings.Contains(responseText, streamingEndMsg) {
-		resp := parseRespForUsage(ctx, responseText)
-		reqCtx.Usage = resp.Usage
-		metrics.RecordInputTokens(reqCtx.IncomingModelName, reqCtx.TargetModelName, resp.Usage.PromptTokens)
-		metrics.RecordOutputTokens(reqCtx.IncomingModelName, reqCtx.TargetModelName, resp.Usage.CompletionTokens)
 	}
 }
 

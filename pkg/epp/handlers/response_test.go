@@ -194,3 +194,37 @@ func TestHandleResponseBodyAddsMetricsToResponseMetadata(t *testing.T) {
 		assert.Equal(t, float64(30), requestMetrics.Fields["total_tokens"].GetNumberValue())
 	})
 }
+
+func TestHandleResponseBodyModelStreamingAddsMetricsToResponseMetadata(t *testing.T) {
+	s := &StreamingServer{}
+
+	t.Run("with usage data sets dynamic metadata", func(t *testing.T) {
+		// setup
+		reqCtx := &RequestContext{
+			modelServerStreaming: true,
+		}
+		body := `data: {"id":"cmpl-41764c93-f9d2-4f31-be08-3ba04fa25394","object":"text_completion","created":1740002445,"model":"food-review-0","choices":[],"usage":{"prompt_tokens":10,"total_tokens":30,"completion_tokens":20}}
+data: [DONE]
+	`
+
+		// execute
+		s.HandleResponseBodyModelStreaming(context.Background(), reqCtx, body)
+
+		// assert
+		require.NotNil(t, reqCtx.respBodyResp)
+		require.NotEmpty(t, reqCtx.respBodyResp)
+
+		lastResp := reqCtx.respBodyResp[len(reqCtx.respBodyResp)-1]
+		require.NotNil(t, lastResp.DynamicMetadata)
+
+		metadata := lastResp.DynamicMetadata.Fields["envoy.dynamic_sharding.metrics"].GetStructValue()
+		require.NotNil(t, metadata)
+
+		requestMetrics := metadata.Fields["request_metrics"].GetStructValue()
+		require.NotNil(t, requestMetrics)
+
+		assert.Equal(t, float64(10), requestMetrics.Fields["prompt_tokens"].GetNumberValue())
+		assert.Equal(t, float64(20), requestMetrics.Fields["completion_tokens"].GetNumberValue())
+		assert.Equal(t, float64(30), requestMetrics.Fields["total_tokens"].GetNumberValue())
+	})
+}
